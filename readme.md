@@ -37,7 +37,7 @@ There is a test marked skipped that you can run to see the whole process from st
 
 
 
-## Update worker
+## Update worker (codeship will do this for you btw)
 
 You need the iron cli client to do this see docs http://dev.iron.io/worker/beta/cli/
 

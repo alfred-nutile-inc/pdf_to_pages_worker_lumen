@@ -34,7 +34,7 @@ function fire($payload)
          */
         $ironmq->postMessage(
                     'diff_tool_file_uploads_ready_to_compare',
-                    $dto,
+                    json_encode($dto),
                     $options = ['timeout' => 600, 'retries' => 1])->id;
 
         echo implode($handler->getResults());
@@ -58,7 +58,7 @@ function fire($payload)
          */
         $ironmq->postMessage(
             'diff_tool_file_uploads_ready_to_compare',
-            ['error' => true, 'message' => $message],
+            json_encode(['error' => true, 'message' => $message]),
             $options = ['timeout' => 600, 'retries' => 1])->id;
 
         echo $message;
