@@ -1,3 +1,5 @@
+[ ![Codeship Status for alfred-nutile-inc/pdf_to_pages_worker_lumen](https://codeship.com/projects/9c90d630-7a4b-0132-cabb-0ec29a4dc4df/status?branch=master)](https://codeship.com/projects/56084)
+
 # PDF 2 Images
 
 ### Step 1)
