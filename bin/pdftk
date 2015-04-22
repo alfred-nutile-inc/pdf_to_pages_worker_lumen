@@ -1,0 +1,6 @@
+#!/bin/bash
+
+#export PATH=/worker/bin:$PATH;
+#export LD_LIBRARY_PATH=/worker/lib:/worker/lib/x86_64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH;
+
+pdftk.target "$@"

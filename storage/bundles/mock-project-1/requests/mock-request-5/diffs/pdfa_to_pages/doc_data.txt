@@ -1,0 +1,48 @@
+InfoBegin
+InfoKey: ModDate
+InfoValue: D:20150410015708Z00'00'
+InfoBegin
+InfoKey: CreationDate
+InfoValue: D:20150410015708Z00'00'
+InfoBegin
+InfoKey: Title
+InfoValue: pdf1
+InfoBegin
+InfoKey: Creator
+InfoValue: Pages
+InfoBegin
+InfoKey: Producer
+InfoValue: Mac OS X 10.10.2 Quartz PDFContext
+PdfID0: a6c5c2ce265f5f3434816dade7589a76
+PdfID1: a6c5c2ce265f5f3434816dade7589a76
+NumberOfPages: 6
+PageMediaBegin
+PageMediaNumber: 1
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
+PageMediaBegin
+PageMediaNumber: 2
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
+PageMediaBegin
+PageMediaNumber: 3
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
+PageMediaBegin
+PageMediaNumber: 4
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
+PageMediaBegin
+PageMediaNumber: 5
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
+PageMediaBegin
+PageMediaNumber: 6
+PageMediaRotation: 0
+PageMediaRect: 0 0 612 792
+PageMediaDimensions: 612 792
