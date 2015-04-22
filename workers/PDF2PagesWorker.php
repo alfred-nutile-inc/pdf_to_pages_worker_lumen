@@ -15,13 +15,16 @@ function fire($payload)
     try
     {
         $handler = new \App\PDF2FilesHandler();
+
         $dto = new \AlfredNutileInc\DiffTool\DiffToolDTO(
-            $payload['request_uuid'],
             $payload['project_id'],
+            $payload['request_uuid'],
             $stage = 0,
             $driver = false,
-            $payload['set']
+            $payload['set'],
+            $payload['user_id']
         );
+
         $handler->handle($dto);
 
         $ironmq = new \IronMQ(array(
@@ -42,11 +45,12 @@ function fire($payload)
 
     catch(\Exception $e)
     {
-        $message = sprintf("Error with the process %s project id %s request id %s set %s",
+        $message = sprintf("Error with the process %s project id %s request id %s set %s message: \n %s",
             $e->getMessage(),
             $payload['project_id'],
             $payload['request_uuid'],
-            $payload['set']);
+            $payload['set'],
+            $e->getMessage());
 
         $ironmq = new \IronMQ(array(
             'token' => env('IRON_TOKEN'),

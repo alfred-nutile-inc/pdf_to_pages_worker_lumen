@@ -47,13 +47,23 @@ class DiffBuckS3Helper {
         return $file;
     }
 
-    public function putFilesToS3($source, $destination)
+    public function putFilesToS3($source, $destination, $set)
     {
-        $this->setupFolder($source, $destination);
+        $this->setupFolder($source, $destination, $set);
 
-        $directories = File::directories($source);
+        if($set == 'compare.json')
+        {
+            $content = File::get($source);
 
-        $this->iterateOverDirectories($destination, $directories);
+            Storage::disk('s3')->put($destination . '/compare.json', $content);
+        }
+        else
+        {
+            $directories = File::directories($source);
+
+            $this->iterateOverDirectories($destination, $directories, $set);
+        }
+
 
     }
 
@@ -74,12 +84,24 @@ class DiffBuckS3Helper {
         $this->project_id = $project_id;
     }
 
-    private function setupFolder($source, $destination)
+    private function setupFolder($source, $destination, $set = 'a')
     {
-        if(!Storage::disk('s3')->exists($destination))
-        {
+
+        if (!Storage::disk('s3')->exists($destination)) {
             Storage::disk('s3')->makeDirectory($destination);
         }
+
+        if($set != 'compare.json') {
+
+            if (!Storage::disk('s3')->exists($destination . '/' . $set)) {
+                Storage::disk('s3')->makeDirectory($destination . '/' . $set);
+            }
+
+            if (!Storage::disk('s3')->exists($destination . '/original_pages/' . $set)) {
+                Storage::disk('s3')->makeDirectory($destination . '/original_pages/' . $set);
+            }
+        }
+
     }
 
     /**
@@ -88,32 +110,40 @@ class DiffBuckS3Helper {
      * @param $name
      * @return array
      */
-    protected function copyFileToS3($destination, $files, $name)
+    protected function copyFileToS3($destination, $files, $set, $type = 'images')
     {
         foreach ($files as $file) {
             $content = File::get($file);
-            $exploded = explode("/", $file);
-            $file_name = array_pop($exploded);
+            $file_name = $this->getFileNameFromPath($file);
+
             $this->setResults(sprintf("Adding file to s3 %s", $file_name));
-            Storage::disk('s3')->put($destination . '/' . $name . '/' . $file_name, $content);
+            if($type == 'images')
+            {
+                Storage::disk('s3')->put($destination . '/' . $set . '/' . $file_name, $content);
+            } else {
+
+                Storage::disk('s3')->put($destination . '/original_pages/' . $set . '/' . $file_name, $content);
+            }
         }
     }
 
-    private function iterateOverDirectories($destination, $directories)
+    private function iterateOverDirectories($destination, $directories, $set)
     {
         foreach($directories as $dir)
         {
-            $exploded = explode("/", $dir);
-            $name = array_pop($exploded);
-
-            if(!Storage::disk('s3')->exists($destination . '/' . $name))
+            /**
+             * We do not need to upload pages just images
+             * but for counting reason we upload pagees too
+             */
+            if(strpos($dir, '_images') > 0)
             {
-                Storage::disk('s3')->makeDirectory($destination . '/' . $name);
+                $files = File::files($dir);
+                $this->copyFileToS3($destination, $files, $set, 'images');
+            } else
+            {
+                $files = File::files($dir);
+                $this->copyFileToS3($destination, $files, $set, 'pages');
             }
-
-            $files = File::files($dir);
-
-            $this->copyFileToS3($destination, $files, $name);
         }
     }
 
@@ -131,6 +161,13 @@ class DiffBuckS3Helper {
     public function setResults($results)
     {
         $this->results[] = $results;
+    }
+
+    private function getFileNameFromPath($file)
+    {
+        $exploded = explode("/", $file);
+        $file_name = array_pop($exploded);
+        return $file_name;
     }
 
 

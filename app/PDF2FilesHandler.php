@@ -10,6 +10,9 @@ namespace App;
 
 
 use AlfredNutileInc\DiffTool\DiffToolDTO;
+use App\Helpers\CompareJsonHelper;
+use App\Helpers\PusherTrait;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +21,10 @@ class PDF2FilesHandler {
 
     use LocalDirectoryHelper;
     use PathHelper;
+    use PusherTrait;
+    use CompareJsonHelper;
 
+    protected $dto;
     protected $results = [];
     protected $set;
 
@@ -59,19 +65,28 @@ class PDF2FilesHandler {
 
     public function handle(DiffToolDTO $payload)
     {
+        $this->setDto($payload);
         $this->setRequestId($payload->request_id);
         $this->setSet($payload->set);
         $this->setProjectId($payload->project_id);
         $this->setLocalDestinationRoot($this->getDiffsRequestFolder());
 
-        //See if this is on S3
-
-        $this->diffBuckS3Helper->getFile($this);
+        try
+        {
+            $this->diffBuckS3Helper->getFile($this);
+        } catch(\Exception $e)
+        {
+            throw new \Exception(sprintf("File not found on S3 for request id %s,
+                    project %s error message \n %s", $this->getRequestId(), $this->getProjectId(), $e->getMessage()));
+        }
 
         $output = $this->breakIntoPages();
         $this->setResults($output);
 
         $output = $this->breakIntoImages();
+        $this->setResults($output);
+
+        $output = $this->writeCompareFile();
         $this->setResults($output);
 
         $output = $this->moveFilesBackToS3();
@@ -80,33 +95,84 @@ class PDF2FilesHandler {
         $this->setResults("Done Working on PDF to Images");
     }
 
+    protected function writeCompareFile()
+    {
+        $this->updateCompareValue('project_id', false, false, $this->getProjectId());
+        $this->updateCompareValue('request_id', false, false, $this->getRequestId());
+        $this->updateCompareValue('stage', false, false, 0);
+        File::put($this->getLocalDestinationRoot() . '/compare.json', json_encode($this->getCompareJsonState(), JSON_PRETTY_PRINT));
+        return sprintf("Wrote compare file to path %s", $this->getLocalDestinationRoot() . '/compare.json');
+
+    }
+
     protected function moveFilesBackToS3()
     {
+
+        /**
+         * Compare File
+         */
+        $source_compare         = $this->getLocalDestinationRoot() . '/compare.json';
+        $destination_compare    = $this->getDiffsRequestFolder() . '/compares';
+
+        $this->diffBuckS3Helper
+            ->putFilesToS3(
+                $source_compare,
+                $destination_compare,
+                'compare.json');
+
+
+        /**
+         * Images and PDFs Pages
+         */
         $this->source_upload_done_files         = $this->getLocalDestinationRoot() . '/diffs';
-        $this->destination_upload_done_files    = $this->getDiffsRequestFolder() . '/diffs';
+        $this->destination_upload_done_files    = $this->getDiffsRequestFolder() . '/compares';
 
-        //Make sure the folder Exists
-        $this->diffBuckS3Helper->putFilesToS3($this->source_upload_done_files, $this->destination_upload_done_files);
+        $this->diffBuckS3Helper
+            ->putFilesToS3(
+                $this->source_upload_done_files,
+                $this->destination_upload_done_files,
+                $this->getSet());
 
-        //Then Copy all the files up to there
         return $this->diffBuckS3Helper->getResults();
 
     }
 
     protected function breakIntoPages()
     {
+        $this->step1 = 'RUNNING';
+        $message = "Step 1: Convert PDFs into Pages is RUNNING";
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
         $this->setPdftkSourceFile($this->getLocalUploadDir() . $this->getSet() . '.pdf');
         $this->setRunPdftkOutputDestination($this->getLocalPDFsToPages($this->getSet()));
 
         if(!File::exists($this->getRunPdftkOutputDestination()))
             File::makeDirectory($this->getRunPdftkOutputDestination(), 0755, $recursive = true, $force = true);
 
+        $this->triggerEvent('Starting',
+                            'upload_and_process_file_' . $this->getDto()->set,
+                            $total_files = 'starting');
+
         $this->PDFTKHelper->run($this->getPdftkSource(), $this->getRunPdftkOutputDestination());
+
+        $this->triggerEvent(
+            $message,
+            'upload_and_process_file_' . $this->getDto()->set, $total_files = 'done');
+
+        $message = "Step 1: Convert PDFs into Pages is DONE";
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
         return implode("\n", $this->PDFTKHelper->getPdftkHelperOutput());
     }
 
     protected function breakIntoImages()
     {
+        $message = "Step 2: Convert PDFs pages into Images is RUNNING";
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
         $this->convert_source = $this->getBundleRequestRootFolderLocal(
                 $this->getProjectId(), $this->getRequestId()) . '/diffs/pdf' . $this->getSet() . '_to_pages';
 
@@ -117,6 +183,15 @@ class PDF2FilesHandler {
             File::makeDirectory($this->convert_destination, 0755, $recursive = true);
 
         $this->convertToImages->convert($this->convert_source, $this->convert_destination, $this->getSet());
+
+        $this->compare_collection = $this->convertToImages->getCompareCollection();
+
+        $message = "Step 2: Convert PDFs pages into Images is DONE";
+
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
+
         return implode("\n", $this->convertToImages->getResults());
     }
 
@@ -280,5 +355,33 @@ class PDF2FilesHandler {
         $this->destination_upload_done_files = $destination_upload_done_files;
     }
 
+    protected function triggerEvent($message, $status, $total_files = false, $request_id = false, $user_id = 0)
+    {
+        if($request_id == false)
+            $request_id = $this->request_id;
+
+        Log::info(sprintf("PusherQuickCompareListener react to event
+                quick_compare with status %s\n user %s \n message %s \n request %s \n total files done %s",
+            $status, $user_id, $message, $request_id, $total_files));
+
+        $this->setMessage([ 'message' => $message, 'status' => $status, 'total_files' => $total_files]);
+        $this->setChannel('approve');
+        $this->setEventName('quick_compare_' . $request_id);
+
+        $this->pushNotice();
+    }
+
+    private function setDto($payload)
+    {
+        $this->dto = $payload;
+    }
+
+    /**
+     * @return DiffToolDTO
+     */
+    public function getDto()
+    {
+        return $this->dto;
+    }
 
 }

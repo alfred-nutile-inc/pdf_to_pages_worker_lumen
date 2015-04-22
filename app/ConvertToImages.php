@@ -9,6 +9,8 @@
 namespace App;
 
 
+use App\Helpers\CompareJsonHelper;
+use App\Helpers\PusherTrait;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +18,7 @@ use Symfony\Component\Process\Process;
 
 class ConvertToImages {
 
-
+    use CompareJsonHelper;
     use PathHelper;
 
     protected $project_id;
@@ -63,10 +65,6 @@ class ConvertToImages {
             }
         }
 
-        $this->step1 = 'RUNNING';
-        $message = "Step 2: Convert PDFs pages into Images is RUNNING";
-        Log::info($message);
-        $this->triggerEvent($message, StatusHelper::$RUNNING);
 
         while(count($jobs) > 0)
         {
@@ -83,19 +81,18 @@ class ConvertToImages {
                         //@NOTE not sure if I should throw here.
                         throw new \Exception($message);
                     }
-                    //$compare_key = $job['data']['count']; //set page 1 and up so we have the order even if they render out of order
-                    //$dto = $this->buildDto( $job['data']['compare_dto'], $compare_key);
-                    //$this->addCompareNode($dto, 'images_' . $job['data']['set'], $compare_key);
+                    $compare_key = $job['data']['count']; //set page 1 and up so we have the order even if they render out of order
+                    $dto = $this->buildDto( $job['data']['compare_dto'], $compare_key);
+                    $this->addCompareNode($dto, 'images_' . $job['data']['set'], $compare_key);
                     $this->setResults($job['path']);
                     unset($jobs[$key]);
                 }
             }
         }
 
-        $message = "Step 2: Convert PDFs pages into Images is DONE";
 
-        Log::info($message);
-        $this->triggerEvent($message, StatusHelper::$DONE);
+
+        return $this->compare_collection;
 
     }
 
@@ -132,17 +129,7 @@ class ConvertToImages {
     }
 
 
-    protected function triggerEvent($message, $status, $total_files = false)
-    {
-//        Event::fire('quick_compare',
-//            [
-//                'message'        => $message,
-//                'request_id'     => $this->getRequestUuid(),
-//                'user'           => $this->getDiffRequest()->user_id,
-//                'status'         => $status,
-//                'total_files'    => $total_files
-//            ]);
-    }
+
 
     /**
      * @return mixed
