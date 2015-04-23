@@ -23,7 +23,7 @@ class DiffToolDTO {
 
     private function get_user_id()
     {
-        return (!Auth::guest()) ? Auth::user()->id : 0;
+        return 0;
     }
 
 }

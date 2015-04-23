@@ -29,12 +29,13 @@ class PDFTKHelper {
         $export2 = 'export LD_LIBRARY_PATH=' . $base_path . '/lib:' . $base_path . '/lib/x86_64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH';
         $command = "$export1 && $export2 && chmod +x {$pdftk}.target && {$pdftk}.target {$file} burst output {$destination}/page_%03d.pdf";
 
-        exec("rm -f {$destination}/*.pdf", $output, $results);
-        $this->pdftk_helper_output = $this->pdftk_helper_output + $output;
 
         exec($command, $output, $results);
+        $output[] = "PDFTK OUTPUT Code to destination {$destination}\n";
         $this->pdftk_helper_output = $this->pdftk_helper_output + $output;
 
+        exec("ls -al {$destination}", $output);
+        $this->pdftk_helper_output = $this->pdftk_helper_output + $output;
     }
 
     /**

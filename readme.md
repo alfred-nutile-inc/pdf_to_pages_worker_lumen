@@ -52,13 +52,23 @@ Now you are ready
 When the worker is done being edited zip it up
 
 ~~~
-zip -r PDF2PagesWorker.zip .
+zip -r PDF2PagesWorker.zip . -x *.git*
 ~~~
 
 Then upload
 
+first in your home directory make a .iron.json file
+
 ~~~
-iron worker upload --stack php-5.6 PDF2PagesWorker.zip php workers/PDF2PagesWorker.php
+{
+  "token": "bar"
+}
+~~~
+
+Then
+
+~~~
+IRON_PROJECT_ID=foo iron worker upload --stack php-5.6 PDF2PagesWorker.zip php workers/PDF2PagesWorker.php
 ~~~
 
 What is really cool is that all along you can be testing this

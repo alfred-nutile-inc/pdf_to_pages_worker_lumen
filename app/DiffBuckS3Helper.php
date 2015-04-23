@@ -42,9 +42,32 @@ class DiffBuckS3Helper {
         $this->file_name = $filesHandler->getSet() . '.pdf';
         $file = Storage::disk('s3')->get($this->getBundleRequestOriginalsFolder() . $this->file_name);
 
+        //See if folder is set and writable
 
         File::put($this->getLocalUploadDir() . $this->file_name, $file);
         return $file;
+    }
+
+    public function getAllFilesForDiff($destination, $source)
+    {
+        foreach(['a', 'b'] as $set)
+        {
+            if(!File::exists($destination . '/' . $set))
+                File::makeDirectory($destination . '/' . $set, 0755, $recursive = true);
+
+            $path  = $source . '/' . $set;
+            $files = Storage::disk('s3')->files($path);
+
+            foreach($files as $file)
+            {
+                $content = Storage::disk('s3')->get($file);
+                $file_name = $this->getFileNameFromPath($file);
+                File::put($destination . '/' . $set . '/' . $file_name, $content);
+            }
+        }
+
+        $content = Storage::disk('s3')->get($source . '/compare.json');
+        File::put($destination . '/compare.json', $content);
     }
 
     public function putFilesToS3($source, $destination, $set)

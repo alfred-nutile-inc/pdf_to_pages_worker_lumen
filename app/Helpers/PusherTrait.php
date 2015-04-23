@@ -73,9 +73,20 @@ trait PusherTrait {
     {
         if($websockets == null)
         {
-            $websockets = App::make('App\Interfaces\WebsocketInterface');
+            //$websockets = App::make('\App\Interfaces\WebsocketInterface');
+            $websockets = $this->makePusher();
         }
         $this->websockets = $websockets;
+    }
+
+    protected function makePusher()
+    {
+        $public = getenv('PUSHER_PUBLIC');
+        $secret = getenv('PUSHER_SECRET');
+        $app_id = getenv('PUSHER_APP_ID');
+        $debug_setting = false;
+        $timeout = 60;
+        return new PusherService($public, $secret, $app_id, $debug = $debug_setting, $host = 'https://api.pusherapp.com', $port = '443', $timeout);
     }
 
     /**

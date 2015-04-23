@@ -1,0 +1,4 @@
+runtime "php"
+stack "php-5.4"
+exec "workers/PDF2PagesWorker.php"
+

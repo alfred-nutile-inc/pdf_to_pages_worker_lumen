@@ -15,6 +15,7 @@ class WorkerFireTest extends TestCase {
         parent::setUp();
 
         $this->mock_convert   = m::mock('App\ConvertToImages');
+        $this->mock_convert->shouldReceive('getCompareCollection')->andReturn(['foo']);
         $this->mock_pdftk = m::mock('App\PDFTKHelper');
 
     }
@@ -188,6 +189,7 @@ class WorkerFireTest extends TestCase {
         File::shouldReceive('directories')->andReturn(['foo', 'bar']);
         File::shouldReceive('deleteDirectory')->andReturn(true);
         File::shouldReceive('exists')->andReturn(true);
+        File::shouldReceive('isWritable')->andReturn(true);
         File::shouldReceive('get')->andReturn('foo bar');
         File::shouldReceive('put')->andReturn(true);
         File::shouldReceive('copyDirectory')->andReturn(['foo', 'bar']);
@@ -203,7 +205,6 @@ class WorkerFireTest extends TestCase {
 
     public function tearDown()
     {
-        m::close();
         parent::tearDown();
     }
 

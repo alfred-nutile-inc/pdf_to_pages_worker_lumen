@@ -17,16 +17,12 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class PDF2FilesHandler {
+class PDF2FilesHandler extends BaseHandler {
 
     use LocalDirectoryHelper;
     use PathHelper;
     use PusherTrait;
     use CompareJsonHelper;
-
-    protected $dto;
-    protected $results = [];
-    protected $set;
 
     protected $run_pdftk_output_destination;
     protected $pdftk_source;
@@ -45,8 +41,7 @@ class PDF2FilesHandler {
      */
     private $diffBuckS3Helper;
 
-    public $request_id;
-    public $project_id;
+
 
     /**
      * @var ConvertToImages
@@ -71,6 +66,7 @@ class PDF2FilesHandler {
         $this->setProjectId($payload->project_id);
         $this->setLocalDestinationRoot($this->getDiffsRequestFolder());
 
+        $this->makeSureFoldersAreReadWrite();
         try
         {
             $this->diffBuckS3Helper->getFile($this);
@@ -80,12 +76,26 @@ class PDF2FilesHandler {
                     project %s error message \n %s", $this->getRequestId(), $this->getProjectId(), $e->getMessage()));
         }
 
-        $output = $this->breakIntoPages();
-        $this->setResults($output);
+        try
+        {
+            $output = $this->breakIntoPages();
+            $this->setResults($output);
+        }
+        catch(\Exception $e)
+        {
+            throw new \Exception(sprintf("Error breaking pdf into pages %s", $e->getMessage()));
+        }
 
-        $output = $this->breakIntoImages();
-        $this->setResults($output);
+        try
+        {
+            $output = $this->breakIntoImages();
+            $this->setResults($output);
 
+        }
+        catch(\Exception $e)
+        {
+            throw new \Exception(sprintf("Error breaking pdf into images %s", $e->getMessage()));
+        }
         $output = $this->writeCompareFile();
         $this->setResults($output);
 
@@ -154,11 +164,23 @@ class PDF2FilesHandler {
                             'upload_and_process_file_' . $this->getDto()->set,
                             $total_files = 'starting');
 
+        $message = sprintf("Source folder %s destination folder %s", $this->getPdftkSource(), $this->getRunPdftkOutputDestination());
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
         $this->PDFTKHelper->run($this->getPdftkSource(), $this->getRunPdftkOutputDestination());
+
+        $message = implode("\n", $this->PDFTKHelper->getPdftkHelperOutput());
+        $this->triggerEvent(
+            $message,
+            'upload_and_process_file_' . $this->getDto()->set,
+            $total_files = 'pdftk_output');
+
 
         $this->triggerEvent(
             $message,
-            'upload_and_process_file_' . $this->getDto()->set, $total_files = 'done');
+            'upload_and_process_file_' . $this->getDto()->set,
+            $total_files = 'done');
 
         $message = "Step 1: Convert PDFs into Pages is DONE";
         Log::info($message);
@@ -180,7 +202,15 @@ class PDF2FilesHandler {
                 $this->getProjectId(), $this->getRequestId()) . '/diffs/pdf' . $this->getSet() . '_to_images';
 
         if(!File::exists($this->convert_destination))
-            File::makeDirectory($this->convert_destination, 0755, $recursive = true);
+            File::makeDirectory($this->convert_destination, 0777, $recursive = true);
+
+        $message = sprintf("Source folder for Convert %s destination folder %s", $this->convert_source, $this->convert_destination);
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
+        exec("ls -al {$this->convert_destination}", $output);
+        $this->triggerEvent(implode("\n", $output), 0, false, $this->getRequestId(), $this->getDto()->user_id);
+
 
         $this->convertToImages->convert($this->convert_source, $this->convert_destination, $this->getSet());
 
@@ -195,69 +225,7 @@ class PDF2FilesHandler {
         return implode("\n", $this->convertToImages->getResults());
     }
 
-    /**
-     * @return array
-     */
-    public function getResults()
-    {
-        return $this->results;
-    }
 
-    /**
-     * @param array $results
-     */
-    public function setResults($results)
-    {
-        $this->results[] = $results;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getRequestId()
-    {
-        return $this->request_id;
-    }
-
-    /**
-     * @param mixed $request_id
-     */
-    public function setRequestId($request_id)
-    {
-        $this->request_id = $request_id;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getProjectId()
-    {
-        return $this->project_id;
-    }
-
-    /**
-     * @param mixed $project_id
-     */
-    public function setProjectId($project_id)
-    {
-        $this->project_id = $project_id;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getSet()
-    {
-        return $this->set;
-    }
-
-    /**
-     * @param mixed $set
-     */
-    public function setSet($set)
-    {
-        $this->set = $set;
-    }
 
     /**
      * @return mixed
@@ -371,17 +339,19 @@ class PDF2FilesHandler {
         $this->pushNotice();
     }
 
-    private function setDto($payload)
-    {
-        $this->dto = $payload;
-    }
 
-    /**
-     * @return DiffToolDTO
-     */
-    public function getDto()
+
+
+
+    private function makeSureFoldersAreReadWrite()
     {
-        return $this->dto;
+        $storage = storage_path();
+
+        exec("chmod -R 777 {$storage}", $output);
+
+        if(!File::isWritable(storage_path()))
+            throw new \Exception(sprintf("Folder not writable %s message %s", storage_path(), implode("\n", $output)));
+
     }
 
 }

@@ -39,6 +39,8 @@ class ConvertToImages {
     {
         $jobs = [];
 
+
+
         $this->setSource($source);
         $this->setDestination($destination);
         $this->setSet($set);
@@ -79,7 +81,7 @@ class ConvertToImages {
                         Log::info($message);
                         $this->setResults("Error $message");
                         //@NOTE not sure if I should throw here.
-                        throw new \Exception($message);
+                        //throw new \Exception($message);
                     }
                     $compare_key = $job['data']['count']; //set page 1 and up so we have the order even if they render out of order
                     $dto = $this->buildDto( $job['data']['compare_dto'], $compare_key);
@@ -103,7 +105,10 @@ class ConvertToImages {
         $this->imageDestination =  $this->getDestination();
         $image_name = "page_{$count_formatted}.png";
 
-        $command = "convert -density {$this->getDensity()} {$full_path_to_pdf} {$this->imageDestination}/$image_name";
+        $storage = storage_path();
+        $temp = "export MAGICK_TMPDIR={$storage}";
+
+        $command = "$temp && convert -density {$this->getDensity()} {$full_path_to_pdf} {$this->imageDestination}/$image_name";
 
         $compare_data = ['image_destination' => $this->getDestination(),
             'image_name' => $image_name];
