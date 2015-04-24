@@ -60,11 +60,18 @@ class PDF2FilesHandler extends BaseHandler {
 
     public function handle(DiffToolDTO $payload)
     {
+
+
         $this->setDto($payload);
         $this->setRequestId($payload->request_id);
         $this->setSet($payload->set);
         $this->setProjectId($payload->project_id);
         $this->setLocalDestinationRoot($this->getDiffsRequestFolder());
+
+        exec("/usr/bin/gs -v", $out);
+        $message = implode("\n", $out);
+        Log::info($message);
+        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
 
         $this->makeSureFoldersAreReadWrite();
         try

@@ -65,10 +65,8 @@ function fire($payload)
 
 
         exec("which gs", $out);
-        $handler->setResults($out);
+        $handler->setResults(implode("\n", $out));
 
-        exec("gs", $out);
-        $handler->setResults($out);
 
         echo implode($handler->getResults());
     }
