@@ -5,11 +5,35 @@ namespace App\Helpers;
 use App\CompareDTO;
 use App\Exceptions\CompareJsonMissingInfoException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 
 trait CompareJsonHelper {
 
-    protected $compare_json_state = [];
-    protected $compare_collection;
+    public $compare_json_state = [];
+    public $compare_collection;
+
+    /**
+     * Load compare.json from the file system
+     * and prepare the Collection class on it
+     * @param $source
+     */
+    public function loadCompareFromFile($source)
+    {
+        $this->compare_json_state = json_decode(File::get($source), 1);
+
+
+        if(isset($this->compare_json_state['images_a']))
+        {
+            $collection = new Collection($this->compare_json_state['images_a']);
+            $this->compare_json_state['images_a'] = $collection; //$this->flattenButKeepOrder($collection);
+        }
+        if(isset($this->compare_json_state['images_b']))
+        {
+            $collection = new Collection($this->compare_json_state['images_b']);
+            $this->compare_json_state['images_b'] = $collection; //$this->flattenButKeepOrder($collection);
+        }
+
+    }
 
     public function addCompareNode(CompareDTO $compareDTO, $set = 'images_a', $key = false)
     {
@@ -38,6 +62,7 @@ trait CompareJsonHelper {
 
     public function updateCompareValue($set = 'images_a', $key = 0, $name = false, $value)
     {
+
         if(in_array($set, ['project_id', 'stage', 'request_id']))
         {
             $this->compare_json_state[$set] = $value;
@@ -82,10 +107,15 @@ trait CompareJsonHelper {
     {
         if(count($items) > 0)
         {
-            $items = $items->sortBy(function($value) { return $value['original_page'];});
+            $items = $items->sortBy( function($value) {
+                    return (isset($value['original_page']) ? $value['original_page'] : 0);
+                }
+            );
             $results = [];
             foreach($items as $index => $item)
             {
+                if(!isset($item['original_page']))
+                    $item['original_page'] = $index;
                 $results[] = $item;
             }
             return $results;
@@ -114,15 +144,8 @@ trait CompareJsonHelper {
     protected function buildDto($result, $original_page = 0)
     {
         return new CompareDTO(
-            $path = $result['image_destination'] . $result['image_name'],
-            $dirname = $result['image_destination'],
             $custom_name = false,
-            $timestamp = false,
-            $size = false,
-            $type = 'file',
             $basename = $result['image_name'],
-            $extension = false,
-            $filename = false,
             $url = false,
             $quick_diff = false,
             $original_page

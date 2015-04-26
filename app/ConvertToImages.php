@@ -94,7 +94,7 @@ class ConvertToImages {
 
 
 
-        return $this->compare_collection;
+        return $this->compare_json_state;
 
     }
 

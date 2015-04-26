@@ -77,6 +77,12 @@ What is really cool is that all along you can be testing this
 docker run --rm -v "$(pwd)":/worker -w /worker iron/images:php-5.6 sh -c "php /worker/workers/PDF2PagesWorker.php -payload tests/testspayload.json"
 ~~~
 
+or to simulate the diff worklfow
+
+~~~
+docker run --rm -v "$(pwd)":/worker -w /worker iron/images:php-5.6 sh -c "php /worker/workers/PDF2PagesWorker.php -payload tests/testspayloadStageDiffImages.json"
+~~~
+
 And as with docker you can get inside if needed
 
 ~~~

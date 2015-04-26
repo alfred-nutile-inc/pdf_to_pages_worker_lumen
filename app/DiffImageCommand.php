@@ -27,14 +27,29 @@ class DiffImageCommand {
     protected $destination;
     protected $root;
     protected $both_files_done_diffing;
+    /**
+     * @var ConvertCommandWrapper
+     */
+    private $convertCommandWrapper;
 
 
-    public function createDiffOfImages($root)
+    public function __construct(
+        ConvertCommandWrapper $convertCommandWrapper = null)
     {
+        $this->convertCommandWrapper = ($convertCommandWrapper == null) ? new ConvertCommandWrapper() : $convertCommandWrapper;
+    }
+
+    public function createDiffOfImages($root, $compare_json_state)
+    {
+        $this->compare_json_state = $compare_json_state;
+
         $jobs = [];
         $this->file_one_array = File::files($root . '/a');
+
         $this->file_two_array = File::files($root . '/b');
         $this->root = $root;
+        $this->setFoldersUp();
+        $this->convertCommandWrapper->setRoot($root);
 
         $this->setTheSmallerCollection();
         $this->setFileOneCount(1);
@@ -57,7 +72,8 @@ class DiffImageCommand {
                 Log::info("Make diff");
                 Log::info($file1);
                 Log::info($file2);
-                $command = $this->createDiffCommand($file1, $file2, $key);
+                Log::info("\nKey $key");
+                $command = $this->convertCommandWrapper->createDiffCommand($file1, $file2, $key);
 
                 $process = (new Process($command));
                 $process->setTimeout(700);
@@ -66,7 +82,7 @@ class DiffImageCommand {
 
                 $process->start();
 
-                $key = $this->file_one_count; //this should match the item in the array;
+                //$key = $this->file_one_count; //this should match the item in the array;
 
                 $jobs[$key]['process'] = $process;
                 $jobs[$key]['data']    = ['set' => 'images_a', 'key' => $key, 'count' => $this->file_one_count];
@@ -82,20 +98,30 @@ class DiffImageCommand {
                 {
                     $results = $this->getCompareDiffResultsFromCommandOutput($key);
                     $this->triggerEvent($message, 'quick_diff_progress', $total_files = $job['data']['count']);
-                    $this->updateCompareJson($job, $results);
+
+                    try
+                    {
+                        $this->updateCompareJson($job, $results);
+                    }
+                    catch(\Exception $e)
+                    {
+                        throw new \Exception(sprintf("Error writing file to system for compare json %s", $e->getMessage()));
+                    }
+
                     unset($jobs[$key]);
                 }
             }
         }
 
         $message = "Step 3: Compare PDF 1 pages to PDF 2 pages is DONE";
-
         $this->triggerEvent($message, 'quick_diff_done', $total_files = count($this->file_two_array));
-        $this->setBothFilesDoneDiffing(true);
         Log::info($message);
+
+        $this->setBothFilesDoneDiffing(true);
 
         return $this->compare_json_state;
     }
+
 
     protected function triggerEvent()
     {
@@ -110,6 +136,33 @@ class DiffImageCommand {
         $compare_key    = $job['data']['key'];
         $this->updateCompareValue($set, $compare_key, $name, $value);
     }
+
+
+    /**
+     * @return mixed
+     */
+    public function getFileOneArray()
+    {
+        return $this->file_one_array;
+    }
+
+
+    /**
+     * @return mixed
+     */
+    public function getFileTwoArray()
+    {
+        return $this->file_two_array;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getSmallerCollection()
+    {
+        return $this->smaller_collection;
+    }
+
 
     /**
      * @return mixed
@@ -132,15 +185,10 @@ class DiffImageCommand {
         $results = file_get_contents("/tmp/output_{$key}.txt");
         $results = (trim($results) == 'inf') ? 0 : trim($results); //inf = no change I want 0
         $results = (strpos($results, 'compare.im6: image widths or heights differ') !== false) ? 1000 : $results;
-        return $results;
-    }
 
-    protected function createDiffCommand($file1, $file2, $key)
-    {
-        $this->destination = $this->getRoot() . '/compares/diff_images/compared-a-b-page_' . $key . '.png';
-        $name = 'output_' . $key;
-        $command = "compare -metric PSNR {$file1} {$file2} {$this->destination} 2> /tmp/{$name}.txt";
-        return $command;
+        Log::info("results for key " . $key);
+        Log::info($results);
+        return $results;
     }
 
     protected function setTheSmallerCollection()
@@ -217,5 +265,11 @@ class DiffImageCommand {
     public function setBothFilesDoneDiffing($both_files_done_diffing)
     {
         $this->both_files_done_diffing = $both_files_done_diffing;
+    }
+
+    private function setFoldersUp()
+    {
+        if(!File::exists($this->root . '/diff_images'))
+            File::makeDirectory($this->root . '/diff_images');
     }
 }

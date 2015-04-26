@@ -70,6 +70,45 @@ class DiffBuckS3Helper {
         File::put($destination . '/compare.json', $content);
     }
 
+    public function putDiffImagesOnS3($source, $destination)
+    {
+        if (!Storage::disk('s3')->exists($destination)) {
+            Storage::disk('s3')->makeDirectory($destination);
+        }
+
+        $files = File::files($source);
+
+        foreach($files as $file)
+        {
+            $content = File::get($file);
+            $file_name = File::name($file);
+            $this->setResults(sprintf("Adding file to s3 %s", $file_name));
+            Storage::disk('s3')->put($destination . '/' . $file_name, $content);
+        }
+    }
+
+    public function putCompareOnS3($content, $destination)
+    {
+        Storage::disk('s3')->put($destination, $content);
+    }
+
+    protected function copyFileToS3($destination, $files = array(), $set, $type = 'images')
+    {
+        foreach ($files as $file) {
+            $content = File::get($file);
+            $file_name = $this->getFileNameFromPath($file);
+
+            $this->setResults(sprintf("Adding file to s3 %s", $file_name));
+            if($type == 'images')
+            {
+                Storage::disk('s3')->put($destination . '/' . $set . '/' . $file_name, $content);
+            } else {
+
+                Storage::disk('s3')->put($destination . '/original_pages/' . $set . '/' . $file_name, $content);
+            }
+        }
+    }
+
     public function putFilesToS3($source, $destination, $set)
     {
         $this->setupFolder($source, $destination, $set);
@@ -114,7 +153,7 @@ class DiffBuckS3Helper {
             Storage::disk('s3')->makeDirectory($destination);
         }
 
-        if($set != 'compare.json') {
+        if($set != 'compare.json' && $set != 'diff_images') {
 
             if (!Storage::disk('s3')->exists($destination . '/' . $set)) {
                 Storage::disk('s3')->makeDirectory($destination . '/' . $set);
@@ -127,28 +166,8 @@ class DiffBuckS3Helper {
 
     }
 
-    /**
-     * @param $destination
-     * @param $files
-     * @param $name
-     * @return array
-     */
-    protected function copyFileToS3($destination, $files, $set, $type = 'images')
-    {
-        foreach ($files as $file) {
-            $content = File::get($file);
-            $file_name = $this->getFileNameFromPath($file);
 
-            $this->setResults(sprintf("Adding file to s3 %s", $file_name));
-            if($type == 'images')
-            {
-                Storage::disk('s3')->put($destination . '/' . $set . '/' . $file_name, $content);
-            } else {
 
-                Storage::disk('s3')->put($destination . '/original_pages/' . $set . '/' . $file_name, $content);
-            }
-        }
-    }
 
     private function iterateOverDirectories($destination, $directories, $set)
     {

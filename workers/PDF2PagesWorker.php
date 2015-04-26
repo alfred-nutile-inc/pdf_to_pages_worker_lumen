@@ -30,6 +30,12 @@ function fire($payload)
         );
 
 
+        /**
+         * What task are we doing
+         * PDF to Images
+         * or
+         * Diff Images
+         */
         if($dto->stage === 'ready_to_diff')
         {
             $handler = new \App\DiffImagesHandler();
@@ -46,8 +52,7 @@ function fire($payload)
 
         if($dto->stage == 'ready_to_diff')
         {
-            //NOT SURE WHAT QUEUE
-            $queue_name = 'diff_tool_file_uploads_ready_to_compareFOO';
+            $queue_name = 'diff_tool_files_ready_for_quick_diff';
         }
         else
         {
@@ -62,10 +67,6 @@ function fire($payload)
         $content = file_get_contents(storage_path('logs/lumen.log'));
         $handler->setResults("Now for the log");
         $handler->setResults($content);
-
-
-        exec("which gs", $out);
-        $handler->setResults(implode("\n", $out));
 
 
         echo implode($handler->getResults());

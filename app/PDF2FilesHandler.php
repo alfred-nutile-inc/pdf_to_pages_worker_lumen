@@ -19,10 +19,7 @@ use Illuminate\Support\Facades\Storage;
 
 class PDF2FilesHandler extends BaseHandler {
 
-    use LocalDirectoryHelper;
-    use PathHelper;
     use PusherTrait;
-    use CompareJsonHelper;
 
     protected $run_pdftk_output_destination;
     protected $pdftk_source;
@@ -60,18 +57,11 @@ class PDF2FilesHandler extends BaseHandler {
 
     public function handle(DiffToolDTO $payload)
     {
-
-
         $this->setDto($payload);
         $this->setRequestId($payload->request_id);
         $this->setSet($payload->set);
         $this->setProjectId($payload->project_id);
         $this->setLocalDestinationRoot($this->getDiffsRequestFolder());
-
-        exec("/usr/bin/gs -v", $out);
-        $message = implode("\n", $out);
-        Log::info($message);
-        $this->triggerEvent($message, 0, false, $this->getRequestId(), $this->getDto()->user_id);
 
         $this->makeSureFoldersAreReadWrite();
         try
@@ -112,23 +102,13 @@ class PDF2FilesHandler extends BaseHandler {
         $this->setResults("Done Working on PDF to Images");
     }
 
-    protected function writeCompareFile()
-    {
-        $this->updateCompareValue('project_id', false, false, $this->getProjectId());
-        $this->updateCompareValue('request_id', false, false, $this->getRequestId());
-        $this->updateCompareValue('stage', false, false, 0);
-        File::put($this->getLocalDestinationRoot() . '/compare.json', json_encode($this->getCompareJsonState(), JSON_PRETTY_PRINT));
-        return sprintf("Wrote compare file to path %s", $this->getLocalDestinationRoot() . '/compare.json');
-
-    }
-
     protected function moveFilesBackToS3()
     {
 
         /**
          * Compare File
          */
-        $source_compare         = $this->getLocalDestinationRoot() . '/compare.json';
+        $source_compare         = $this->getLocalDestinationRoot() . '/compares/compare.json';
         $destination_compare    = $this->getDiffsRequestFolder() . '/compares';
 
         $this->diffBuckS3Helper
@@ -219,9 +199,7 @@ class PDF2FilesHandler extends BaseHandler {
         $this->triggerEvent(implode("\n", $output), 0, false, $this->getRequestId(), $this->getDto()->user_id);
 
 
-        $this->convertToImages->convert($this->convert_source, $this->convert_destination, $this->getSet());
-
-        $this->compare_collection = $this->convertToImages->getCompareCollection();
+        $this->compare_json_state = $this->convertToImages->convert($this->convert_source, $this->convert_destination, $this->getSet());
 
         $message = "Step 2: Convert PDFs pages into Images is DONE";
 
@@ -345,9 +323,6 @@ class PDF2FilesHandler extends BaseHandler {
 
         $this->pushNotice();
     }
-
-
-
 
 
     private function makeSureFoldersAreReadWrite()
